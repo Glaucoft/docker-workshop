@@ -21,10 +21,13 @@ RUN uv sync --locked
 
 # Copy application code
 # copy the script to the container. 1st name is source file, 2nd is destination
-COPY pipeline.py .
+
+# COPY pipeline.py .
+COPY ingest_data.py .
 
 # Set entry point
 #ENTRYPOINT ["uv","run","python", "pipeline.py"]
 
 # Os parâmetros ("uv","run",) foram incluidos do PATH
-ENTRYPOINT ["python", "pipeline.py"]
+#ENTRYPOINT ["python", "pipeline.py"]
+ENTRYPOINT ["python", "ingest_data.py"]
