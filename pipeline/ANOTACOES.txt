@@ -30,4 +30,78 @@ docker run -it --rm \
   --year=2021 \
   --month=1 \
   --chunksize=100000
-  
+
+####################################################
+COMANDOS:
+
+docker network create pg-network
+docker volume rm ny_taxi_postgres_data pgadmin_data
+docker rm pgadmin
+
+--------------------------------------------------- < INÍCIO >
+No docker-compose sobem os serviços, por exemplo: Banco e pgAdmin
+O INGEST não é um serviço, mas sim um JOB, desta forma é executado de forma apartada
+
+1) Subir os serviços via docker-compose;
+2) Fazer o ingest;
+
+127.0.0.1:8085
+Servers > Register > Server...
+General/Name: pg
+Connections/host=pgdatabase/Username_and_Password=root
+SAVE
+--------------------------------------------------- < FIM >
+
+OBSERVAÇÃO: Após alterações no arquivo de ingest, sempre dar o BUILD   <<<<<<<<<<---     A T E N Ç Ã O
+docker build -t taxi_ingest:v001 .
+
+docker build -t taxi_ingest:v002 .
+
+docker-compose down -v
+
+-- Valida se sobrou algo ativo:
+docker ps -a
+docker volume ls
+
+docker-compose up -d
+
+docker ps
+
+
+Caminho                   Existe quando?
+/app	                    Só se estiver no Dockerfile
+/data	                    Só se você montar com -v
+/workspaces/...	          ❌ nunca existe no container
+
+
+# Script de Ingest HOMEWORK
+docker run -it --rm \
+  --network=pipeline_pg-network \
+  -v $(pwd)/data:/data \
+  taxi_ingest:v002 \
+  --pg-user=root \
+  --pg-pass=root \
+  --pg-host=pgdatabase \
+  --pg-port=5432 \
+  --pg-db=ny_taxi \
+  --year=2025 \
+  --month=11 \
+  --target-table=yellow_taxi_trips_2025_11 \
+  --chunksize=100000
+
+
+  --input-file=/yellow_tripdata_2025-11.parquet
+
+
+--- Consulta SQL no próprio Terminal:
+docker exec -it pgdatabase psql -U root -d ny_taxi
+SELECT COUNT(*) FROM yellow_taxi_trips_2025_11;
+\q
+
+
+--- Teste de leitura do arquivo:
+$ docker run --rm \
+  --entrypoint python \
+  -v $(pwd)/data:/data \
+  taxi_ingest:v002 \
+  -c "import pyarrow.parquet as pq; t=pq.read_table('/data/yellow_tripdata_2025-11.parquet'); print(t.num_rows)"
