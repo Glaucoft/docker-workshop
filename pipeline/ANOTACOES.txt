@@ -38,34 +38,35 @@ docker network create pg-network
 docker volume rm ny_taxi_postgres_data pgadmin_data
 docker rm pgadmin
 
+sudo mv <file> <dir>
 --------------------------------------------------- < INÍCIO >
-No docker-compose sobem os serviços, por exemplo: Banco e pgAdmin
+-- Ante de iniciar verifique se o docker e volume estão rodando/montados;
+docker ps -a
+docker volume ls
+
+-- Se estiver rodando/montados, devem ser parados/desmontados antes de iniciar o pipeline/ingest:
+docker-compose down -v
+docker volume rm <vol_name>
+
+-- No docker-compose sobem os serviços, por exemplo: Banco e pgAdmin
 O INGEST não é um serviço, mas sim um JOB, desta forma é executado de forma apartada
 
 1) Subir os serviços via docker-compose;
+       docker-compose up -d
+
 2) Fazer o ingest;
 
+-- Console
 127.0.0.1:8085
 Servers > Register > Server...
-General/Name: pg
-Connections/host=pgdatabase/Username_and_Password=root
+General-Name: pg
+Connections-host=pgdatabase/Username_and_Password=root
 SAVE
 --------------------------------------------------- < FIM >
 
 OBSERVAÇÃO: Após alterações no arquivo de ingest, sempre dar o BUILD   <<<<<<<<<<---     A T E N Ç Ã O
 docker build -t taxi_ingest:v001 .
-
 docker build -t taxi_ingest:v002 .
-
-docker-compose down -v
-
--- Valida se sobrou algo ativo:
-docker ps -a
-docker volume ls
-
-docker-compose up -d
-
-docker ps
 
 
 Caminho                   Existe quando?
@@ -74,7 +75,7 @@ Caminho                   Existe quando?
 /workspaces/...	          ❌ nunca existe no container
 
 
-# Script de Ingest HOMEWORK
+# Script de Ingest HOMEWORK (Executar a partir do diretório: /workspaces/docker-workshop/pipeline)
 docker run -it --rm \
   --network=pipeline_pg-network \
   -v $(pwd)/data:/data \
@@ -84,13 +85,16 @@ docker run -it --rm \
   --pg-host=pgdatabase \
   --pg-port=5432 \
   --pg-db=ny_taxi \
+  --target-table=taxi_zone_lookup \
+  --chunksize=100000 \
+  --input-file=/data/taxi_zone_lookup.csv
+
+BACKUP:
+  --target-table=green_taxi_trips_2025_11 \
+  --input-file=/data/green_tripdata_2025-11.parquet
   --year=2025 \
   --month=11 \
-  --target-table=yellow_taxi_trips_2025_11 \
-  --chunksize=100000
 
-
-  --input-file=/yellow_tripdata_2025-11.parquet
 
 
 --- Consulta SQL no próprio Terminal:
@@ -111,38 +115,8 @@ $ docker run --rm \
 
   ############################################## H O M E W O R K ############################################
 
-select count(*)
-from (
-select tt.tpep_pickup_datetime, tt.tpep_dropoff_datetime, tt.passenger_count,
-tt.trip_distance, tt.store_and_fwd_flag, count(*) qtd
-from public.yellow_taxi_trips_2025_11 tt
-where 1=1
-and tt.tpep_pickup_datetime >= to_date('01/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
-and tt.tpep_pickup_datetime <= to_date('30/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
-and tt.tpep_dropoff_datetime >= to_date('01/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
-and tt.tpep_dropoff_datetime <= to_date('30/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
-and tt.trip_distance <= 1
-group by tt.tpep_pickup_datetime, tt.tpep_dropoff_datetime, tt.passenger_count,
-tt.trip_distance, tt.store_and_fwd_flag
-) t
-where t.qtd = 1
-;
-
-
-select to_char(tt.tpep_pickup_datetime, 'dd/mm/yyyy'), max(tt.trip_distance)
-from public.yellow_taxi_trips_2025_11 tt
-where 1=1
-and tt.trip_distance <= 100
-and tt.tpep_pickup_datetime >= to_date('14/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
-and tt.tpep_pickup_datetime <= to_date('25/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
-group by to_char(tt.tpep_pickup_datetime, 'dd/mm/yyyy')
-;
-
+select *
+from public.green_taxi_trips_2025_11
 
 select *
-from public.yellow_taxi_trips_2025_11 tt
-where 1=1
---and tt.trip_distance <= 100
-and tt.tpep_pickup_datetime >= to_date('18/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
-and tt.tpep_pickup_datetime <= to_date('18/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
-group by to_char(tt.tpep_pickup_datetime, 'dd/mm/yyyy')
+from public.taxi_zone_lookup

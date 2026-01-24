@@ -10,7 +10,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from sqlalchemy import create_engine
-from pathlib import Path
+from tqdm.auto import tqdm
 
 dtype = {
     "VendorID": "Int64",
@@ -36,66 +36,58 @@ parse_dates = [
     "tpep_dropoff_datetime"
 ]
 
-
-def read_in_batches(input_file, chunksize):
-    ext = Path(input_file).suffix.lower()
-
-    if ext in [".csv", ".gz"]:
-        print("📄 Formato CSV detectado")
-
-        # Lê apenas o header para decidir parse_dates
-        cols = pd.read_csv(input_file, nrows=0).columns
-
-        valid_parse_dates = [
-            c for c in parse_dates if c in cols
-        ]
-
-        yield from pd.read_csv(
-            input_file,
-            chunksize=chunksize,
-            dtype=dtype,
-            parse_dates=valid_parse_dates if valid_parse_dates else None
-        )
-
-    elif ext == ".parquet":
-        print("🧱 Formato Parquet detectado")
-        table = pq.read_table(input_file)
-        for batch in table.to_batches(max_chunksize=chunksize):
-            yield batch.to_pandas()
-
-    else:
-        raise ValueError(f"Formato não suportado: {ext}")
-
-
 @click.command()
 @click.option('--pg-user', default='root', help='PostgreSQL user')
 @click.option('--pg-pass', default='root', help='PostgreSQL password')
 @click.option('--pg-host', default='localhost', help='PostgreSQL host')
 @click.option('--pg-port', default=5432, type=int, help='PostgreSQL port')
 @click.option('--pg-db', default='ny_taxi', help='PostgreSQL database name')
-@click.option('--target-table', required=True, help='Target table name')
-@click.option('--chunksize', default=100000, type=int, help='Chunk size for files')
 
-@click.option('--input-file', required=True, help='Caminho do arquivo dentro do container')
-def run(pg_user, pg_pass, pg_host, pg_port, pg_db, target_table, chunksize, input_file):
+#@click.option('--year', default=2021, type=int, help='Year of the data')
+#@click.option('--month', default=1, type=int, help='Month of the data')
+@click.option('--year', default=2025, type=int, help='Year of the data')
+@click.option('--month', default=11, type=int, help='Month of the data')
+
+@click.option('--target-table', default='yellow_taxi_trips_2025_11', help='Target table name')
+@click.option('--chunksize', default=100000, type=int, help='Chunk size for reading CSV')
+#def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, chunksize):
+
+@click.option('--input-file', default='/data/yellow_tripdata_2025-11.parquet', help='Caminho do arquivo Parquet dentro do container')
+def run(pg_user, pg_pass, pg_host, pg_port, pg_db, year, month, target_table, chunksize, input_file):
 
     """Ingest NYC taxi data into PostgreSQL database."""
 
-    print(f"Lendo arquivo local: {input_file}")
+ # INICIO -- Direto do site oficial não foi possível, por isso o uso do arquivo localmente
+ #    prefix = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/yellow'
+ #    url = f'{prefix}/yellow_tripdata_2021-01.csv.gz'
+    prefix = 'https://d37ci6vzurychx.cloudfront.net/trip-data'
+    url = f'{prefix}/yellow_tripdata_2025-11.parquet'
+    
+ #    url = input_file
+ # FIM
+
+    print(f"Lendo arquivo Parquet: {input_file}")
     engine = create_engine(f'postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}')
+
+    print("Lendo arquivo Parquet em batches...")
+    table = pq.read_table(input_file)
+
+    print(f"Total de linhas no Parquet: {table.num_rows}")
 
     print("Gravando no PostgreSQL...")
     first = True
-    for df in read_in_batches(input_file, chunksize):
+    for batch in table.to_batches(max_chunksize=chunksize):
+        df = batch.to_pandas()
+
         df.to_sql(
             name=target_table,
             con=engine,
-            if_exists="replace" if first else "append",
+            if_exists='replace' if first else 'append',
             index=False
         )
 
-    print(f"Inseridas {len(df)} linhas")
-    first = False
+        print(f"Inseridas {len(df)} linhas")
+        first = False
 
     print("Ingest concluído com sucesso 🚀")
 
