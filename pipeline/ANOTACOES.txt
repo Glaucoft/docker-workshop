@@ -56,7 +56,7 @@ O INGEST não é um serviço, mas sim um JOB, desta forma é executado de forma 
 
 2) Fazer o ingest;
 
--- Console
+-- Console pgAdmin
 127.0.0.1:8085
 Servers > Register > Server...
 General-Name: pg
@@ -115,8 +115,66 @@ $ docker run --rm \
 
   ############################################## H O M E W O R K ############################################
 
+-- Dimensional
 select *
-from public.green_taxi_trips_2025_11
+from public.taxi_zone_lookup tz
+;
 
+-- Fato
 select *
-from public.taxi_zone_lookup
+from public.green_taxi_trips_2025_11 tt
+;
+
+-- Question 1. What's the version of pip in the python:3.13 image?
+docker run --rm python:3.13 pip --version
+
+-- Question 3. For the trips in November 2025, how many trips had a trip_distance of less than or equal to 1 mile? (1 point)
+select min(tt.lpep_pickup_datetime), max(tt.lpep_pickup_datetime),
+	   min(tt.lpep_dropoff_datetime), max(tt.lpep_dropoff_datetime)
+--  select *
+from public.green_taxi_trips_2025_11 tt  -- 46.912
+where 1=1
+--and tt.lpep_pickup_datetime >= to_date('01/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
+--and tt.lpep_pickup_datetime <= to_date('30/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
+and tt.trip_distance <= 1
+;
+
+-- Question 4. Which was the pick up day with the longest trip distance? Only consider trips with trip_distance less than 100 miles.
+select to_char(tt.lpep_pickup_datetime, 'dd/mm/yyyy'), max(tt.trip_distance)
+from public.green_taxi_trips_2025_11 tt  -- 46.912
+where 1=1
+and tt.lpep_pickup_datetime >= to_date('14/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
+and tt.lpep_pickup_datetime <= to_date('26/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
+and tt.trip_distance <= 100
+group by to_char(tt.lpep_pickup_datetime, 'dd/mm/yyyy')
+order by to_char(tt.lpep_pickup_datetime, 'dd/mm/yyyy')
+;
+
+
+-- Question 5. Which was the pickup zone with the largest total_amount (sum of all trips) on November 18th, 2025? 
+select  to_char(tt.lpep_pickup_datetime, 'dd/mm/yyyy'), z."Zone", sum(tt.total_amount)
+from public.green_taxi_trips_2025_11 tt
+join public.taxi_zone_lookup z
+on 1=1
+and tt."PULocationID" = z."LocationID"
+and tt.lpep_pickup_datetime >= to_date('18/11/2025 00:00:00','dd/mm/yyyy hh24:mi:ss')
+and tt.lpep_pickup_datetime <= to_date('19/11/2025 23:59:59','dd/mm/yyyy hh24:mi:ss')
+and z."Zone" in ('East Harlem North', 'East Harlem South', 'Morningside Heights', 'Forest Hills')
+group by to_char(tt.lpep_pickup_datetime, 'dd/mm/yyyy'), z."Zone"
+order by sum(tt.total_amount)
+;
+
+-- Question 6. For the passengers picked up in the zone named "East Harlem North" in November 2025, which was the drop off zone that had the largest tip?
+select z."Zone", z2."Zone", max(tt.tip_amount)
+from public.green_taxi_trips_2025_11 tt
+join public.taxi_zone_lookup z
+on 1=1
+and tt."PULocationID" = z."LocationID"
+and z."Zone" in ('East Harlem North')
+left join public.taxi_zone_lookup z2
+on tt."DOLocationID" = z2."LocationID"
+and z2."Zone" in ('JFK Airport', 'Yorkville West', 'East Harlem North', 'LaGuardia Airport')
+and z2."Zone" is not null
+group by z."Zone", z2."Zone"
+order by max(tt.tip_amount)
+;
