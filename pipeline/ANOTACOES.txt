@@ -1,3 +1,6 @@
+CURSO:  https://courses.datatalks.club/
+        https://github.com/DataTalksClub/data-engineering-zoomcamp
+
 docker run -it --rm \
   -e POSTGRES_USER="root" \
   -e POSTGRES_PASSWORD="root" \
@@ -32,7 +35,7 @@ docker run -it --rm \
   --chunksize=100000
 
 ####################################################
-COMANDOS:
+COMANDOS: Executar a partir do diretório: /workspaces/docker-workshop/pipeline
 
 docker network create pg-network
 docker volume rm ny_taxi_postgres_data pgadmin_data
