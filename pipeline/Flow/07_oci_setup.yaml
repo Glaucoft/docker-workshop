@@ -1,0 +1,19 @@
+id: 07_oci_setup
+namespace: zoomcamp
+
+tasks:
+  - id: create_oci_bucket
+    type: io.kestra.plugin.oracle.oci.objectstorage.CreateBucket
+    ifExists: SKIP
+    compartmentId: "{{ kv('OCI_COMPARTMENT_OCID') }}"
+    name: "{{ kv('OCI_BUCKET_NAME') }}"
+    publicAccessType: NoPublicAccess
+
+pluginDefaults:
+  - type: io.kestra.plugin.oracle.oci
+    values:
+      tenancyId: "{{ kv('OCI_TENANCY_OCID') }}"
+      userId: "{{ kv('OCI_USER_OCID') }}"
+      fingerprint: "{{ kv('OCI_FINGERPRINT') }}"
+      privateKey: "{{ kv('OCI_PRIVATE_KEY') }}"
+      region: "{{ kv('OCI_REGION') }}"

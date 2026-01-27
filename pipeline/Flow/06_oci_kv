@@ -1,0 +1,60 @@
+id: 06_oci_kv
+namespace: zoomcamp
+
+#👉 NÃO cria nada no OCI
+#👉 NÃO chama a API da Oracle
+#👉 NÃO provisiona bucket, DB ou recurso
+# Ele apenas grava valores no Key-Value Store do Kestra.
+#🔑 KV do Kestra = variáveis de ambiente persistentes internas do Kestra
+
+tasks:
+  - id: oci_tenancy_ocid
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_TENANCY_OCID
+    kvType: STRING
+    value: ocid1.tenancy.oc1..axxxxxxxxxxxxxxxxxxxxwjm2x5ya # seu tenancy OCID
+
+  - id: oci_compartment_ocid
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_COMPARTMENT_OCID
+    kvType: STRING
+    value: ocid1.compartment.oc1..aaaaaaaamt6b5xxxxxxxxxxxxxxxxxa
+
+  - id: oci_region
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_REGION
+    kvType: STRING
+    value: us-chicago-1
+
+  - id: oci_bucket_name
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_BUCKET_NAME
+    kvType: STRING
+    value: kestra-data-lake
+
+  - id: oci_db_name
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_DATABASE
+    kvType: STRING
+    value: zoomcamp
+
+  - id: oci_user_ocid
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_USER_OCID
+    kvType: SECRET
+    value: ocid1.user.oc1..axxxxxxxxxxxxxxxa
+
+  - id: oci_fingerprint
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_FINGERPRINT
+    kvType: SECRET
+    value: "26:37:d7:80:99:2e"
+
+  - id: oci_private_key
+    type: io.kestra.plugin.core.kv.Set
+    key: OCI_PRIVATE_KEY
+    kvType: SECRET
+    value: |
+      -----BEGIN PRIVATE KEY-----
+      rggDmanpdqhNdcXEddTta5u382DDVvF+xZSOx22+AKbDSHKIKC+QsN43mDjPF
+            -----END PRIVATE KEY-----
