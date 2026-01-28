@@ -1,0 +1,179 @@
+id: 08_oci_taxi
+namespace: zoomcamp
+description: NYC Taxi ingestion using OCI + Oracle Autonomous
+
+inputs:
+  - id: taxi
+    type: SELECT
+    values: [yellow, green]
+    defaults: green
+
+  - id: year
+    type: STRING
+    defaults: "2019"
+
+  - id: month
+    type: STRING
+    defaults: "01"
+
+variables:
+  file: "{{inputs.taxi}}_tripdata_{{inputs.year}}-{{inputs.month}}.csv"
+  object_path: "nyc/{{inputs.taxi}}/{{vars.file}}"
+
+tasks:
+# 1️⃣ Download CSV
+  - id: extract_csv
+    type: io.kestra.plugin.scripts.shell.Commands
+    runner: DOCKER
+    docker:
+      image: alpine:3.19
+    outputFiles:
+      - "*.csv"
+    commands:
+      - |
+        set -e
+        apk add --no-cache curl gzip
+
+        FILE="{{inputs.taxi}}_tripdata_{{inputs.year}}-{{inputs.month}}.csv"
+        URL="https://github.com/DataTalksClub/nyc-tlc-data/releases/download/{{inputs.taxi}}/${FILE}.gz"
+
+        echo "Downloading $URL"
+        curl -L "$URL" | gunzip > "$FILE"
+
+# 2️⃣ Upload para OCI Object Storage
+  - id: upload_to_oci
+    type: io.kestra.plugin.scripts.shell.Commands
+    runner: DOCKER
+    docker:
+      image: ghcr.io/oracle/oci-cli:latest
+      entryPoint:
+        - /bin/sh
+        - -c
+    commands:
+      - |
+        oci os object put \
+          --bucket-name {{kv('OCI_BUCKET_NAME')}} \
+          --namespace {{kv('OCI_NAMESPACE')}} \
+          --file {{vars.file}} \
+          --name {{vars.object_path}} \
+          --region {{kv('OCI_REGION')}}
+
+# 3️⃣ Drop external table (Oracle-safe)
+  - id: drop_external_table
+    type: io.kestra.plugin.jdbc.oracle.Query
+    url: "{{kv('OCI_DATABASE')}}"
+    username: "{{kv('OCI_DB_USER')}}"
+    password: "{{kv('OCI_DB_PASSWORD')}}"
+    sql: |
+      BEGIN
+        EXECUTE IMMEDIATE 'DROP TABLE EXT_{{inputs.taxi}}_TRIPDATA';
+      EXCEPTION
+        WHEN OTHERS THEN
+          IF SQLCODE != -942 THEN
+            RAISE;
+          END IF;
+      END;
+      /
+
+# 4️⃣ Create external table (colunas explícitas)
+  - id: create_external_table
+    type: io.kestra.plugin.jdbc.oracle.Query
+    url: "{{kv('OCI_DB_URL')}}"
+    username: "{{kv('OCI_DB_USER')}}"
+    password: "{{kv('OCI_DB_PASSWORD')}}"
+    sql: |
+      BEGIN
+        DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+          table_name => 'EXT_{{inputs.taxi}}_TRIPDATA',
+          credential_name => 'OCI_CRED',
+          file_uri_list => 'https://objectstorage.{{kv('OCI_REGION')}}.oraclecloud.com/n/{{kv('OCI_TENANCY_OCID')}}/b/{{kv('OCI_BUCKET_NAME')}}/o/{{vars.object_path}}',
+          format => json_object(
+            'type' value 'csv',
+            'skipheaders' value 1,
+            'dateformat' value 'YYYY-MM-DD HH24:MI:SS'
+          ),
+          column_list => '
+            VendorID NUMBER,
+            pickup_datetime TIMESTAMP,
+            dropoff_datetime TIMESTAMP,
+            passenger_count NUMBER,
+            trip_distance NUMBER,
+            total_amount NUMBER
+          '
+        );
+      END;
+      /
+
+# 5️⃣ Create target table (Oracle-compatible)
+  - id: create_target_table
+    type: io.kestra.plugin.jdbc.oracle.Query
+    url: "{{kv('OCI_DATABASE')}}"
+    username: "{{kv('OCI_DB_USER')}}"
+    password: "{{kv('OCI_DB_PASSWORD')}}"
+    sql: |
+      BEGIN
+        EXECUTE IMMEDIATE '
+          CREATE TABLE {{inputs.taxi}}_tripdata (
+            unique_row_id VARCHAR2(64),
+            filename VARCHAR2(255),
+            pickup_datetime TIMESTAMP,
+            dropoff_datetime TIMESTAMP,
+            passenger_count NUMBER,
+            trip_distance NUMBER,
+            total_amount NUMBER
+          )
+        ';
+      EXCEPTION
+        WHEN OTHERS THEN
+          IF SQLCODE != -955 THEN
+            RAISE;
+          END IF;
+      END;
+      /
+
+# 6️⃣ Merge (lógica original preservada)
+  - id: merge_data
+    type: io.kestra.plugin.jdbc.oracle.Query
+    url: "{{kv('OCI_DATABASE')}}"
+    username: "{{kv('OCI_DB_USER')}}"
+    password: "{{kv('OCI_DB_PASSWORD')}}"
+    sql: |
+      MERGE INTO {{inputs.taxi}}_tripdata t
+      USING (
+        SELECT
+          STANDARD_HASH(
+            VendorID || pickup_datetime || dropoff_datetime,
+            'MD5'
+          ) AS unique_row_id,
+          '{{vars.file}}' AS filename,
+          pickup_datetime,
+          dropoff_datetime,
+          passenger_count,
+          trip_distance,
+          total_amount
+        FROM EXT_{{inputs.taxi}}_TRIPDATA
+      ) s
+      ON (t.unique_row_id = s.unique_row_id)
+      WHEN NOT MATCHED THEN
+        INSERT (
+          unique_row_id,
+          filename,
+          pickup_datetime,
+          dropoff_datetime,
+          passenger_count,
+          trip_distance,
+          total_amount
+        )
+        VALUES (
+          s.unique_row_id,
+          s.filename,
+          s.pickup_datetime,
+          s.dropoff_datetime,
+          s.passenger_count,
+          s.trip_distance,
+          s.total_amount
+        );
+
+# 7️⃣ Cleanup
+  - id: cleanup
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
