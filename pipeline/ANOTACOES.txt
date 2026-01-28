@@ -113,8 +113,12 @@ $ docker run --rm \
   taxi_ingest:v002 \
   -c "import pyarrow.parquet as pq; t=pq.read_table('/data/yellow_tripdata_2025-11.parquet'); print(t.num_rows)"
 
-
-
+-- Limpeza/Liberação de espaço no Codespace:
+docker system prune -af --volumes
+pip cache purge
+npm cache clean --force
+sudo apt-get clean
+sudo apt-get autoremove -y
 
   ############################################## H O M E W O R K ############################################
 
