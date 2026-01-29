@@ -1,5 +1,12 @@
 *.parquet
 
+# Oracle Autonomous DB Wallet
+wallet/
+*.sso
+*.p12
+*.jks
+*.pem
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

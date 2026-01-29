@@ -73,7 +73,9 @@ services:
       - kestra_data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
+      - ./wallet:/kestra/wallet
     environment:
+      TNS_ADMIN: /kestra/wallet
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:

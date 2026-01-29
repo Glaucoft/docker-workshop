@@ -114,11 +114,13 @@ $ docker run --rm \
   -c "import pyarrow.parquet as pq; t=pq.read_table('/data/yellow_tripdata_2025-11.parquet'); print(t.num_rows)"
 
 -- Limpeza/Liberação de espaço no Codespace:
+df -h
 docker system prune -af --volumes
 pip cache purge
 npm cache clean --force
 sudo apt-get clean
 sudo apt-get autoremove -y
+sudo rm -rf /var/lib/apt/lists/*
 
   ############################################## H O M E W O R K ############################################
 
