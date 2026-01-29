@@ -61,7 +61,8 @@ tasks:
 # 3️⃣ Drop external table (Oracle-safe)
   - id: drop_external_table
     type: io.kestra.plugin.jdbc.oracle.Query
-    url: "{{kv('OCI_DATABASE')}}"
+    url: "{{kv('OCI_DB_URL')}}"
+    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
@@ -79,6 +80,7 @@ tasks:
   - id: create_external_table
     type: io.kestra.plugin.jdbc.oracle.Query
     url: "{{kv('OCI_DB_URL')}}"
+    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
@@ -107,7 +109,8 @@ tasks:
 # 5️⃣ Create target table (Oracle-compatible)
   - id: create_target_table
     type: io.kestra.plugin.jdbc.oracle.Query
-    url: "{{kv('OCI_DATABASE')}}"
+    url: "{{kv('OCI_DB_URL')}}"
+    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
@@ -134,7 +137,8 @@ tasks:
 # 6️⃣ Merge (lógica original preservada)
   - id: merge_data
     type: io.kestra.plugin.jdbc.oracle.Query
-    url: "{{kv('OCI_DATABASE')}}"
+    url: "{{kv('OCI_DB_URL')}}"
+    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |

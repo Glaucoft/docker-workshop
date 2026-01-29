@@ -1,5 +1,7 @@
 CURSO:  https://courses.datatalks.club/
         https://github.com/DataTalksClub/data-engineering-zoomcamp
+        https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+        https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf
 
 docker run -it --rm \
   -e POSTGRES_USER="root" \
