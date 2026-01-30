@@ -2,6 +2,8 @@ CURSO:  https://courses.datatalks.club/
         https://github.com/DataTalksClub/data-engineering-zoomcamp
         https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
         https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf
+SOURCE: https://github.com/DataTalksClub/nyc-tlc-data/releases
+
 
 docker run -it --rm \
   -e POSTGRES_USER="root" \
@@ -123,6 +125,13 @@ npm cache clean --force
 sudo apt-get clean
 sudo apt-get autoremove -y
 sudo rm -rf /var/lib/apt/lists/*
+
+
+-- Verifica se o container está visualizando a wallet
+docker exec -it pipeline-kestra-1 ls -l /kestra/wallet
+
+
+docker compose build --no-cache
 
   ############################################## H O M E W O R K ############################################
 

@@ -1,0 +1,4 @@
+FROM kestra/kestra:v1.1
+
+# Copia os drivers Oracle
+COPY oracle-libs/*.jar /app/libs/

@@ -49,8 +49,11 @@ tasks:
       entryPoint:
         - /bin/sh
         - -c
+      volumes:
+        - ./oci:/root/.oci  # monta o config + chave privada OCI
     commands:
       - |
+        echo "Uploading {{vars.file}} to OCI bucket {{kv('OCI_BUCKET_NAME')}}"
         oci os object put \
           --bucket-name {{kv('OCI_BUCKET_NAME')}} \
           --namespace {{kv('OCI_NAMESPACE')}} \
@@ -62,7 +65,6 @@ tasks:
   - id: drop_external_table
     type: io.kestra.plugin.jdbc.oracle.Query
     url: "{{kv('OCI_DB_URL')}}"
-    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
@@ -80,14 +82,13 @@ tasks:
   - id: create_external_table
     type: io.kestra.plugin.jdbc.oracle.Query
     url: "{{kv('OCI_DB_URL')}}"
-    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
       BEGIN
         DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
           table_name => 'EXT_{{inputs.taxi}}_TRIPDATA',
-          credential_name => 'OCI_CRED',
+          credential_name => 'OCI_CRED',  -- credential deve existir no Autonomous DB
           file_uri_list => 'https://objectstorage.{{kv('OCI_REGION')}}.oraclecloud.com/n/{{kv('OCI_TENANCY_OCID')}}/b/{{kv('OCI_BUCKET_NAME')}}/o/{{vars.object_path}}',
           format => json_object(
             'type' value 'csv',
@@ -110,7 +111,6 @@ tasks:
   - id: create_target_table
     type: io.kestra.plugin.jdbc.oracle.Query
     url: "{{kv('OCI_DB_URL')}}"
-    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
@@ -138,7 +138,6 @@ tasks:
   - id: merge_data
     type: io.kestra.plugin.jdbc.oracle.Query
     url: "{{kv('OCI_DB_URL')}}"
-    driverClassName: oracle.jdbc.OracleDriver
     username: "{{kv('OCI_DB_USER')}}"
     password: "{{kv('OCI_DB_PASSWORD')}}"
     sql: |
