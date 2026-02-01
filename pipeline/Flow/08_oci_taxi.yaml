@@ -26,9 +26,10 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     runner: DOCKER
     docker:
-      image: alpine:3.19
+#      image: alpine:3.19
+       image: alpine:latest
     outputFiles:
-      - "*.csv"
+      - "{{vars.file}}"
     commands:
       - |
         set -e
@@ -40,8 +41,23 @@ tasks:
         echo "Downloading $URL"
         curl -L "$URL" | gunzip > "$FILE"
 
+  - id: debug_outputs
+    type: io.kestra.plugin.scripts.shell.Commands
+    commands:
+      - |
+        echo "===== ALL OUTPUTS ====="
+        echo '{{ outputs | toJson }}'
+
+  - id: debug_extract
+    type: io.kestra.plugin.scripts.shell.Commands
+    commands:
+      - |
+        echo "===== EXTRACT CSV ====="
+        echo '{{ outputs.extract_csv | toJson }}'
+
 # 2️⃣ Upload para OCI Object Storage
-  - id: upload_to_oci
+#  - id: upload_to_oci
+  - id: ingest_to_oci
     type: io.kestra.plugin.scripts.shell.Commands
     runner: DOCKER
     docker:
@@ -49,18 +65,45 @@ tasks:
       entryPoint:
         - /bin/sh
         - -c
-      volumes:
-        - ./oci:/root/.oci  # monta o config + chave privada OCI
     commands:
       - |
-        echo "Uploading {{vars.file}} to OCI bucket {{kv('OCI_BUCKET_NAME')}}"
-        oci os object put \
-          --bucket-name {{kv('OCI_BUCKET_NAME')}} \
-          --namespace {{kv('OCI_NAMESPACE')}} \
-          --file {{vars.file}} \
-          --name {{vars.object_path}} \
-          --region {{kv('OCI_REGION')}}
+        set -euo pipefail
 
+        echo "OCI CONFIG TEST"
+        oci iam region list
+        oci os ns get
+
+        TAXI="{{ inputs.taxi }}"
+        YEAR="{{ inputs.year }}"
+        MONTH="{{ inputs.month }}"
+
+        FILE="${TAXI}_tripdata_${YEAR}-${MONTH}.csv"
+        URL="https://github.com/DataTalksClub/nyc-tlc-data/releases/download/${TAXI}/${FILE}.gz"
+        OBJECT_PATH="nyc/${TAXI}/${YEAR}/${MONTH}.csv"
+
+        echo "Downloading $URL"
+        curl -fL "$URL" | gunzip > "$FILE"
+
+        echo "File size:"
+        ls -lh "$FILE"
+
+        echo "=== OCI DEBUG ==="
+        oci iam region list
+        oci iam user get --user-id $(oci iam user list --all --query 'data[0].id' --raw-output)
+        oci os bucket list --compartment-id ocid1.compartment.oc1..aaaaaaaamt6b5xnhpzctnjbaxgedvye7ilu2eet43kb6w6k7sr52louedaaa
+        echo "================="
+
+        echo "Uploading to OCI → $OBJECT_PATH"
+        oci os object put \
+          --bucket-name {{ kv('OCI_BUCKET_NAME') }} \
+          --namespace {{ kv('OCI_NAMESPACE') }} \
+          --name "$OBJECT_PATH" \
+          --file /tmp/"$FILE" \
+          --force \
+          --region {{ kv('OCI_REGION') }}
+
+        echo "Upload concluído com sucesso"
+ 
 # 3️⃣ Drop external table (Oracle-safe)
   - id: drop_external_table
     type: io.kestra.plugin.jdbc.oracle.Query

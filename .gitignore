@@ -1,3 +1,6 @@
+# Data
+*.csv
+*.zip
 *.parquet
 
 # Oracle Autonomous DB Wallet
@@ -6,6 +9,10 @@ wallet/
 *.p12
 *.jks
 *.pem
+
+# IDE
+.vscode/
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -62,7 +62,8 @@ services:
       - pg-network
 
   kestra:
-    image: kestra/kestra:v1.1
+#    image: kestra/kestra:v1.1
+    image: kestra/kestra:latest
     container_name: kestra
     pull_policy: always
     user: "root"

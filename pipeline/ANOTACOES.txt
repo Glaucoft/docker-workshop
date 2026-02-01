@@ -60,6 +60,7 @@ O INGEST não é um serviço, mas sim um JOB, desta forma é executado de forma 
 
 1) Subir os serviços via docker-compose;
        docker-compose up -d
+       docker compose up -d
 
 2) Fazer o ingest;
 
@@ -132,8 +133,10 @@ docker exec -it pipeline-kestra-1 ls -l /kestra/wallet
 
 
 docker compose build --no-cache
+docker restart kestra
 
   ############################################## H O M E W O R K ############################################
+[01-docker-terraform]
 
 -- Dimensional
 select *
@@ -204,3 +207,31 @@ order by max(tt.tip_amount)
 
 -- Question 7. Which of the following sequences describes the Terraform workflow for: 1) Downloading plugins and setting up backend, 2) Generating and executing changes, 3) Removing all resources?
 terraform init, terraform apply -auto-approve, terraform destroy
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+[02-workflow-orchestration]
+
+-- Question 1. Within the execution for Yellow Taxi data for the year 2020 and month 12: what is the uncompressed file size (i.e. the output file yellow_tripdata_2020-12.csv of the extract task)?
+128 MB (134.483.968 bytes)
+
+-- Question 2. What is the rendered value of the variable file when the inputs taxi is set to green, year is set to 2020, and month is set to 04 during execution? (1 point)
+green_tripdata_2020-04.csv
+
+-- Question 3. How many rows are there for the Yellow Taxi data for all CSV files in the year 2020? (1 point)
+select count(*) 
+from admin.EXT_YELLOW_TRIPDATA;
+24.648.499
+
+-- Question 4. How many rows are there for the Green Taxi data for all CSV files in the year 2020?
+select count(*)
+from admin.EXT_GREEN_TRIPDATA gt;
+1.734.051
+
+-- Question 5. How many rows are there for the Yellow Taxi data for the March 2021 CSV file? (1 point)
+1.925.152
+
+-- Question 6. How would you configure the timezone to New York in a Schedule trigger? (1 point)
+Add a timezone property set to America/New_York in the Schedule trigger configuration
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
