@@ -235,3 +235,135 @@ from admin.EXT_GREEN_TRIPDATA gt;
 Add a timezone property set to America/New_York in the Schedule trigger configuration
 ---------------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------
+
+[03-data-warehouse]
+
+-- Question 1. What is count of records for the 2024 Yellow Taxi Data? (1 point)
+EXPLAIN PLAN FOR
+select count(*)
+from admin.EXT_YELLOW_TRIPDATA_PQ
+;
+20.332.093
+
+-- Question 2. What is the estimated amount of data that will be read when this query is executed on the External Table and the Table? (1 point)
+0 MB for the External Table and 155.12 MB for the Materialized Table
+
+-- External table
+SELECT
+  sql_id,
+  elapsed_time,
+  buffer_gets,
+  disk_reads
+FROM v$sql
+WHERE sql_text LIKE '%EXT_YELLOW_TRIPDATA_PQ%';
+
+-- Materialized table
+SELECT
+  segment_name,
+  bytes / 1024 / 1024 AS size_mb
+FROM dba_segments
+WHERE segment_name = 'EXT_YELLOW_TRIPDATA_PQ_MT';
+
+
+-- Question 3. Why are the estimated number of Bytes different? (1 point)
+BigQuery is a columnar database, and it only scans the specific columns requested in the query. 
+Querying two columns (PULocationID, DOLocationID) requires reading more data than querying one column (PULocationID), leading to a higher estimated number of bytes processed.
+
+-- Question 4. How many records have a fare_amount of 0? (1 point)
+select count(*)
+from admin.EXT_YELLOW_TRIPDATA_PQ yt
+where yt.fare_amount = 0;
+8.333
+
+-- Question 5. What is the best strategy to make an optimized table in Big Query if your query will always filter based on tpep_dropoff_datetime and order the results by VendorID (Create a new table with this strategy) (1 point)
+Partition by tpep_dropoff_datetime and Cluster on VendorID
+
+-- Cria a tabela particionada
+CREATE TABLE YELLOW_TRIPDATA_OPT
+PARTITION BY RANGE (tpep_dropoff_datetime)
+INTERVAL (NUMTODSINTERVAL(1, 'DAY'))
+(
+  PARTITION p_start VALUES LESS THAN (DATE '2024-01-01')
+)
+AS
+SELECT *
+FROM EXT_YELLOW_TRIPDATA_PQ;
+
+-- Valida o particionamento
+SELECT
+  partition_name,
+  high_value
+FROM user_tab_partitions
+WHERE table_name = 'YELLOW_TRIPDATA_OPT'
+ORDER BY partition_position;
+
+-- Otimiza as queries
+ALTER TABLE YELLOW_TRIPDATA_OPT INMEMORY;
+
+-- Cria o índice para o order by frequente
+CREATE INDEX IDX_YTD_VENDOR
+ON YELLOW_TRIPDATA_OPT (VendorID);
+
+
+-- Question 6. Write a query to retrieve the distinct VendorIDs between tpep_dropoff_datetime 2024-03-01 and 2024-03-15 (inclusive). Use the materialized table you created earlier in your from clause and note the estimated bytes. Now change the table in the from clause to the partitioned table you created for question 5 and note the estimated bytes processed. What are these values? (1 point)
+310.24 MB for non-partitioned table and 26.84 MB for the partitioned table
+
+-- Criação da tabela materializada
+create table EXT_YELLOW_TRIPDATA_PQ_mt as 
+select *
+from admin.EXT_YELLOW_TRIPDATA_PQ
+;
+
+select count(distinct(mt.vendorid))
+from admin.EXT_YELLOW_TRIPDATA_PQ_mt mt
+where 1=1
+and mt.tpep_dropoff_datetime >= to_date('01/03/2024 00:00:00','dd/mm/yyyy hh24:MI:ss')
+and mt.tpep_dropoff_datetime <= to_date('15/03/2024 23:59:59','dd/mm/yyyy hh24:MI:ss')
+;
+
+SELECT
+  sql_id,
+  elapsed_time,
+  buffer_gets,
+  disk_reads
+--  select *
+FROM v$sql
+WHERE sql_text LIKE '%count(distinct(mt.vendorid))%';
+Disk_reads = 49117 x 8Kb = 392Mb
+
+select count(distinct(opt.vendorid))
+from admin.YELLOW_TRIPDATA_OPT opt
+where 1=1
+and opt.tpep_dropoff_datetime >= to_date('01/03/2024 00:00:00','dd/mm/yyyy hh24:MI:ss')
+and opt.tpep_dropoff_datetime <= to_date('15/03/2024 23:59:59','dd/mm/yyyy hh24:MI:ss')
+;
+
+SELECT
+  sql_id,
+  elapsed_time,
+  buffer_gets,
+  disk_reads
+--  select *
+FROM v$sql
+WHERE sql_text LIKE '%count(distinct(opt.vendorid))%';
+Disk_reads = 4246 x 8Kb = 33Mb
+
+-- Question 7. Where is the data stored in the External Table you created? (1 point)
+GCP Bucket
+
+-- Question 8. It is best practice in Big Query to always cluster your data: (1 point)
+False
+
+-- Question 9. Write a `SELECT count(*)` query FROM the materialized table you created. How many bytes does it estimate will be read? Why? (not graded)
+select count(*)
+from admin.EXT_YELLOW_TRIPDATA_PQ_mt mt;
+
+select *
+FROM v$sql
+WHERE sql_text LIKE '%count(*)%admin.EXT_YELLOW_TRIPDATA_PQ_mt mt%';
+Disk_reads = 4 x 8Kb = 32Kb
+
+The estimated bytes read is close to zero.
+This happens because the query is a simple COUNT(*) over a materialized table, and the database engine can retrieve the row count from metadata and statistics without scanning the actual data blocks.
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
